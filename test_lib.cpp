@@ -1,5 +1,8 @@
 #include <iostream>
 #include "DNSMsg.h"
+#include <stdint.h>
+
+
 
 using namespace std;
 

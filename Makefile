@@ -10,7 +10,7 @@ test_lib: $(CPP_OBJ_FILES)
 	g++ $(CPP_OBJ_FILES) -o test_lib
 
 %.o: %.cpp $(H_FILES)
-	g++ $< -I -ldl -std=c++98 -c -o $@ -g 
+	g++ $< -I -ldl -std=c++11 -c -o $@ -g 
 
 clean:
 	-rm -rf *.o
