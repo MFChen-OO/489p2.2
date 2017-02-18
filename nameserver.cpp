@@ -124,49 +124,24 @@ void round_robin(char * log, char * port_num, char * servers) {
 		abort();
 	}
 
-	// fd_set readSet;
-	// vector<int> fds;
-
 	while (true) {
-		// FD_ZERO(&readSet);
-		// FD_SET(sd, &readSet);
-
-		// for (int i = 0; i < (int) fds.size(); i++) {
-		// 	FD_SET(fds[i], &readSet);
-		// }
-		
-		// int maxfd = 0;
-		// if (fds.size() > 0) {
-		// 	maxfd = *max_element(fds.begin(), fds.end());
-		// }
-		// maxfd = max(maxfd, sd);
-
-		// int err = select(maxfd + 1, &readSet, NULL, NULL, NULL);
-		// assert(err != -1);
-
-		// // if listener port is set
-		// if (FD_ISSET(sd, &readSet)) {
-		// 	sin_size = sizeof(their_addr);
-		// 	int clientsd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
-		// 	if (clientsd == -1) {
-		// 		cout << "Error on accept" << endl;
-		// 	} else {
-		// 		fds.push_back(clientsd);
-		// 	}
-		// }
 		sin_size = sizeof(their_addr);
+		cout << sin_size << endl;
+		cout << sockfd << endl;
 		clientsd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
+		cout << sin_size << endl;
+		cout << clientsd << endl;
 		if (clientsd == -1) {
-			perror("accept");
+			// perror("accept");
 			abort();
 		}
-
+		cout << sin_size << endl;
 		inet_ntop(their_addr.ss_family,
 			get_in_addr((struct sockaddr *)&their_addr),
 			ipstr, sizeof(ipstr));
 
 
-
+		cout << sin_size << endl;
 		// check all new sockets
 		int bytesRecvd, numBytes;
 		// for (int i = 0; i < (int) fds.size(); i++) {
