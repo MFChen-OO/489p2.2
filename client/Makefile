@@ -4,15 +4,15 @@ H_FILES := $(wildcard *.h)
 
 .PHONY: all clean
 
-all: nameserver
+all: test_client
 
-nameserver: $(CPP_OBJ_FILES) 
-	g++ $(CPP_OBJ_FILES) -o nameserver
+test_client: $(CPP_OBJ_FILES) 
+	g++ $(CPP_OBJ_FILES) -o test_client
 
 %.o: %.cpp $(H_FILES)
-	g++ $< -I -ldl -std=c++11 -c -o $@ -g 
+	g++ $< -I -ldl -std=c++11 -c -o $@ -g -fno-inline
 
 clean:
 	-rm -rf *.o
-	-rm nameserver
+	-rm test_client
 
