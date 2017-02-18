@@ -1,3 +1,4 @@
 *.o
 *.out
-test_lib
+nameserver
+test_client
