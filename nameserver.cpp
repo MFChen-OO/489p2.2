@@ -24,6 +24,8 @@ using namespace std;
 #define MAX_QLEN 120
 #define MAX_RLEN 220
 
+#define BACKLOG 20
+
 struct path {
 	int id;
 	int cost; // cost from client to the node
@@ -36,6 +38,106 @@ struct comp {
 		return p1.cost > p2.cost;
 	}
 };
+
+class round_robin {
+	vector<string> ip_addrs;
+	int idx;
+
+public:
+	void init(char * file) {
+		idx = 0;
+
+		string ip_addr;
+		ifstream fin;
+		fin.open(file);
+		if (!fin.is_open()) {
+			cout << "open failed" << endl;
+			exit(1);
+		}
+		while (fin >> ip_addr) {
+			ip_addrs.push_back(ip_addr);
+		}
+	}
+
+	string get_ip() {
+		string ip = ip_addrs[idx];
+		idx = (idx + 1) % (int) ip_addrs.size();
+	}
+};
+
+class geo_based {
+	vector<string> ips;
+	vector<string> types;
+	unordered_map<string, int> id_table;
+	unordered_map<int, vector<pair<int, int>>> network; // first is id, second is cost
+
+public:
+	void init(char * file) {
+		int num_nodes, num_links, id, id1, id2, cost;
+		string ip, type, tok;
+
+		ifstream fin;
+		fin.open("geo_dist.txt");
+		if (!fin.is_open()) {
+			cout << "open failed" << endl;
+			exit(1);
+		}
+		
+		fin >> tok >> num_nodes;
+		for (int i = 0; i < num_nodes; i++) {
+			fin >> id >> type >> ip;
+			cout << id << ' ' << type << ' ' << ip << endl;
+			ips.push_back(ip);
+			types.push_back(type);
+			id_table[ip] = i;
+		}
+
+		fin >> tok;
+		fin >> num_links;
+		for (int i = 0; i < num_links; i++) {
+			fin >> id1 >> id2 >> cost;
+			network[id1].push_back(make_pair(id2, cost));
+			network[id2].push_back(make_pair(id1, cost));
+		}
+	}
+
+	string get_ip(string client_ip) {
+		priority_queue<path, vector<path>, comp> pq;
+		vector<bool> visited(ips.size(), false);
+		int start_id = id_table[client_ip];
+		path start(start_id, 0);
+		path cur_path, next_path;
+
+		pq.push(start);
+		while (!pq.empty()) {
+			cur_path = pq.top();
+			pq.pop();
+			if (visited[cur_path.id]) {
+				continue;
+			}
+			visited[cur_path.id] = true;
+
+			if (types[cur_path.id] == "SERVER") {
+				return ips[cur_path.id];
+			}
+
+			for (pair<int, int> next_node : network[cur_path.id]) {
+				 // avoid clients and visited switches added to the queue
+				if (visited[next_node.first] || types[next_node.first] == "CLIENT") {
+					continue;
+				}
+				next_path.id = next_node.first;
+				next_path.cost = cur_path.cost + next_node.second;
+				pq.push(next_path);
+			}
+		}
+		return ""; // sever is not found, return an empty string
+	}
+};
+
+
+
+
 
 int sendall(int s, char *buf, int *len) {
 	int total = 0;
@@ -61,24 +163,21 @@ void *get_in_addr(struct sockaddr *sa) {
 	return &(((struct sockaddr_in6 *)sa)->sin6_addr);
 }
 
-void round_robin(char * log, char * port_num, char * servers) {
-	// read file
-	string ip_addr;
-	vector<string> ip_addrs;
-	int idx = 0;
+int main (int argc, char *argv[]) {
+	ofstream fout;
+	fout.open(argv[1]);
 
-	ifstream fin;
-	fin.open(servers);
-	if (!fin.is_open()) {
-		cout << "open failed" << endl;
-		exit(1);
-	}
-	while (fin >> ip_addr) {
-		ip_addrs.push_back(ip_addr);
+	round_robin r;
+	geo_based g;
+	bool is_geo = *argv[3] - '0';
+	if (is_geo) {
+		g.init(argv[4]);
+	} else {
+		r.init(argv[4]);
 	}
 
 
-	// set socket
+	/////////////////////////////////////////////////////////////////////////////////////
 	int sockfd, clientsd;
 	struct addrinfo hints, *servinfo, *p;
 	struct sockaddr_storage their_addr;
@@ -93,7 +192,7 @@ void round_robin(char * log, char * port_num, char * servers) {
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_flags = AI_PASSIVE;
 
-	if ((rv = getaddrinfo(NULL, port_num, &hints, &servinfo)) != 0) {
+	if ((rv = getaddrinfo(NULL, argv[2], &hints, &servinfo)) != 0) {
 		perror("getaddrinfo");
 		abort();
 	}
@@ -124,169 +223,13 @@ void round_robin(char * log, char * port_num, char * servers) {
 		abort();
 	}
 
-	while (true) {
-		sin_size = sizeof(their_addr);
-		cout << sin_size << endl;
-		cout << sockfd << endl;
-		clientsd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
-		cout << sin_size << endl;
-		cout << clientsd << endl;
-		if (clientsd == -1) {
-			// perror("accept");
-			abort();
-		}
-		cout << sin_size << endl;
-		inet_ntop(their_addr.ss_family,
-			get_in_addr((struct sockaddr *)&their_addr),
-			ipstr, sizeof(ipstr));
-
-
-		cout << sin_size << endl;
-		// check all new sockets
-		int bytesRecvd, numBytes;
-		// for (int i = 0; i < (int) fds.size(); i++) {
-		bytesRecvd = 0;
-		char qmsg[MAX_QLEN];
-		// if (FD_ISSET(fds[i], &readSet)) {
-		while(bytesRecvd < MAX_QLEN) {
-			numBytes = recv(clientsd, qmsg + bytesRecvd, MAX_QLEN - bytesRecvd, 0);
-			if (numBytes < 0) {
-				cout << "Error receiving bytes" << endl;
-				exit(1);
-			}
-			bytesRecvd += numBytes;
-		}
-
-		DNSHeader header;
-		DNSQuestion question;
-		parse_qmsg(qmsg, &header, &question);
-
-		char rmsg[MAX_RLEN];
-		header.QR = 1; // reuse header
-		header.AA = 1;
-
-		if (strcmp(question.QNAME, "video.cse.umich.edu") != 0) {
-			header.RCODE = 3;
-			header.ANCOUNT = 0;
-			int i = 0;
-			header_to_msg(rmsg, &header, i);
-		} else {
-			header.RCODE = 0;
-			header.ANCOUNT = 1;
-
-			DNSRecord record;
-			strcpy(record.NAME, question.QNAME);
-			record.TYPE = 1;
-			record.CLASS = 1;
-			record.TTL = 0;
-
-			string ip = ip_addrs[idx];
-			idx = (idx + 1) % (int) ip_addrs.size();
-
-			record.RDLENGTH = ip.size();
-			strcpy(record.RDATA, ip.c_str());
-			to_rmsg(rmsg, &header, &record);
-		}
-
-		int len = MAX_RLEN;
-		if (sendall(clientsd, rmsg, &len) == -1) {
-			cout << "Error on sendall" << endl;
-			exit(1);
-		}
-
-		close(clientsd);
-		// fds.erase(fds.begin() + i);
-		// }
-		// }
-
-	} // while
-	close(sockfd);
-
-}
-
-void geo_based(char * log, char * port_num, char * servers) {
-	vector<string> ips;
-	vector<string> types;
-	unordered_map<string, int> id_table;
-	unordered_map<int, vector<pair<int, int>>> network; // first is id, second is cost
-	priority_queue<path, vector<path>, comp> pq;
-	int num_nodes, num_links, id, id1, id2, cost;
-	string ip, type, tok;
-
-	ifstream fin;
-	fin.open("geo_dist.txt");
-	if (!fin.is_open()) {
-		cout << "open failed" << endl;
+	if (listen(sockfd, BACKLOG) == -1) {
+		perror("listen");
 		exit(1);
 	}
-	
-	fin >> tok >> num_nodes;
-	for (int i = 0; i < num_nodes; i++) {
-		fin >> id >> type >> ip;
-		cout << id << ' ' << type << ' ' << ip << endl;
-		ips.push_back(ip);
-		types.push_back(type);
-		id_table[ip] = i;
-	}
-
-	fin >> tok;
-	fin >> num_links;
-	for (int i = 0; i < num_links; i++) {
-		fin >> id1 >> id2 >> cost;
-		network[id1].push_back(make_pair(id2, cost));
-		network[id2].push_back(make_pair(id1, cost));
-	}
-
-	// set socket
-	int sockfd, clientsd;
-	struct addrinfo hints, *servinfo, *p;
-	struct sockaddr_storage their_addr;
-	socklen_t sin_size;
-	struct sigaction sa;
-	int yes = 1;
-	char ipstr[INET6_ADDRSTRLEN];
-	int rv, received_total, received_bytes, len;
-
-	memset(&hints, 0, sizeof(hints));
-	hints.ai_family = AF_UNSPEC;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_flags = AI_PASSIVE;
-
-	if ((rv = getaddrinfo(NULL, port_num, &hints, &servinfo)) != 0) {
-		perror("getaddrinfo");
-		abort();
-	}
-
-	for (p = servinfo; p != NULL; p = p->ai_next) {
-		if ((sockfd = socket(p->ai_family, p->ai_socktype, p->ai_protocol)) == -1) {
-			perror("server: socket");
-			continue;
-		}
-
-		if (setsockopt(sockfd, SOL_SOCKET, SO_REUSEADDR, &yes, sizeof(int)) == -1) {
-			perror("setsockopt");
-			abort();
-		}
-
-		if (bind(sockfd, p->ai_addr, p->ai_addrlen) == -1) {
-			close(sockfd);
-			perror("server: bind");
-			continue;
-		}
-		break;
-	}
-
-	freeaddrinfo(servinfo);
-
-	if (p == NULL) {
-		perror("failed to bind");
-		abort();
-	}
-
-	// fd_set readSet;
-	// vector<int> fds;
 
 	while (true) {
+		///////////////////////////////////////////////////////////////////////
 		sin_size = sizeof(their_addr);
 		clientsd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
 		if (clientsd == -1) {
@@ -297,15 +240,12 @@ void geo_based(char * log, char * port_num, char * servers) {
 		inet_ntop(their_addr.ss_family,
 			get_in_addr((struct sockaddr *)&their_addr),
 			ipstr, sizeof(ipstr));
-
-
+		string client_ip(ipstr);
 
 		// check all new sockets
 		int bytesRecvd, numBytes;
-		// for (int i = 0; i < (int) fds.size(); i++) {
 		bytesRecvd = 0;
 		char qmsg[MAX_QLEN];
-		// if (FD_ISSET(fds[i], &readSet)) {
 		while(bytesRecvd < MAX_QLEN) {
 			numBytes = recv(clientsd, qmsg + bytesRecvd, MAX_QLEN - bytesRecvd, 0);
 			if (numBytes < 0) {
@@ -314,59 +254,47 @@ void geo_based(char * log, char * port_num, char * servers) {
 			}
 			bytesRecvd += numBytes;
 		}
-
+		/////////////////////////////////////////////////////////////////////////
 		DNSHeader header;
 		DNSQuestion question;
 		parse_qmsg(qmsg, &header, &question);
 
 		char rmsg[MAX_RLEN];
+		string response_ip;
+
 		header.QR = 1; // reuse header
 		header.AA = 1;
 
-		// find closest server
-		string client_ip(ipstr);
-		int start_id = id_table[client_ip];
-		path start(start_id, 0);
-		path cur_path, next_path;
-
-		pq.push(start);
-		while (!pq.empty()) {
-			cur_path = pq.top();
-			pq.pop();
-			if (types[cur_path.id] == "SERVER") {
-				break;
-			}
-
-			for (pair<int, int> next_node : network[cur_path.id]) {
-				if (types[next_node.first] == "CLIENT") { // avoid client added to the queue
-					continue;
-				}
-				next_path.id = next_node.first;
-				next_path.cost = cur_path.cost + next_node.second;
-				pq.push(next_path);
-			}
-		}
-
-		if (strcmp(question.QNAME, "video.cse.umich.edu") != 0 || types[cur_path.id] != "SERVER") {
+		if (strcmp(question.QNAME, "video.cse.umich.edu") != 0) {
 			header.RCODE = 3;
 			header.ANCOUNT = 0;
 			int i = 0;
 			header_to_msg(rmsg, &header, i);
 		} else {
-			header.RCODE = 0;
-			header.ANCOUNT = 1;
+			if (is_geo) {
+				response_ip = g.get_ip(client_ip);
+			} else {
+				response_ip = r.get_ip();
+			}
 
-			DNSRecord record;
-			strcpy(record.NAME, question.QNAME);
-			record.TYPE = 1;
-			record.CLASS = 1;
-			record.TTL = 0;
+			if (response_ip.empty()) {
+				header.RCODE = 3;
+				header.ANCOUNT = 0;
+				int i = 0;
+				header_to_msg(rmsg, &header, i);
+			} else {
+				header.RCODE = 0;
+				header.ANCOUNT = 1;
 
-			string ip = ips[cur_path.id];
-
-			record.RDLENGTH = ip.size();
-			strcpy(record.RDATA, ip.c_str());
-			to_rmsg(rmsg, &header, &record);
+				DNSRecord record;
+				strcpy(record.NAME, question.QNAME);
+				record.TYPE = 1;
+				record.CLASS = 1;
+				record.TTL = 0;
+				record.RDLENGTH = response_ip.size();
+				strcpy(record.RDATA, response_ip.c_str());
+				to_rmsg(rmsg, &header, &record);
+			}
 		}
 
 		int len = MAX_RLEN;
@@ -376,17 +304,13 @@ void geo_based(char * log, char * port_num, char * servers) {
 		}
 
 		close(clientsd);
-	} // while
-	close(sockfd);
-}
 
-
-int main (int argc, char *argv[]) {
-	bool geo = *argv[3] - '0';
-	if (geo) {
-		geo_based(argv[1], argv[2], argv[4]);
-	} else {
-		round_robin(argv[1], argv[2], argv[4]);
+		// write log
+		fout << client_ip << '\t' << question.QNAME << '\t' << response_ip << endl;
+		cout << client_ip << '\t' << question.QNAME << '\t' << response_ip << endl;
 	}
+
+	close(sockfd);
+
 	return 0;
 }
