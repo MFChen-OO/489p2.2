@@ -85,10 +85,16 @@ void parse_ip(char * rdata, char * ip) {
 
 
 
-
-
-
-
+void ip_to_data(char * rdata, string ip) {
+	int found = 0;
+	int prev;
+	for (int i = 0; i < 3; i++) {
+		prev = found;
+		found = ip.find('.', prev) + 1;
+		rdata[i] = stoi(ip.substr(prev, found - prev));
+	}
+	rdata[3] = stoi(ip.substr(found));
+}
 
 void ushort_to_msg(char * msg, ushort value, int &i) {
 	msg[i++] = value >> 8;

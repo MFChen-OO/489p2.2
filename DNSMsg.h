@@ -1,6 +1,7 @@
 #include "DNSHeader.h"
 #include "DNSQuestion.h"
 #include "DNSRecord.h"
+#include <string>
 
 
 void parse_qmsg(char * msg, DNSHeader * header, DNSQuestion * question);
@@ -10,6 +11,7 @@ int to_qmsg(char * msg, DNSHeader * header, DNSQuestion * question);
 int to_rmsg(char * msg, DNSHeader * header, DNSRecord * record);
 
 void header_to_msg(char * msg, DNSHeader * header, int &i);
+void ip_to_data(char * rdata, std::string ip);
 void parse_ip(char * rdata, char * ip);
 
 // helper function

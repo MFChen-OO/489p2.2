@@ -293,8 +293,8 @@ int main (int argc, char *argv[]) {
 				record.TYPE = 1;
 				record.CLASS = 1;
 				record.TTL = 0;
-				record.RDLENGTH = response_ip.size();
-				strcpy(record.RDATA, response_ip.c_str());
+				record.RDLENGTH = 4;
+				ip_to_data(record.RDATA, response_ip);
 				to_rmsg(rmsg, &header, &record);
 			}
 		}

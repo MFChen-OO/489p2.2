@@ -120,7 +120,8 @@ void get_ip(char *server_name, char *port_num, char *ip_from_dns) {
 
 	if (header.RCODE == 0) {
 		cout << record.RDATA << endl;
-		strcpy(ip_from_dns, record.RDATA);
+		parse_ip(record.RDTA, ip_from_dns);
+		cout << ip_from_dns << endl;
 	}
 
 
