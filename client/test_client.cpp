@@ -119,8 +119,12 @@ void get_ip(char *server_name, char *port_num, char *ip_from_dns) {
 	parse_rmsg(rmsg, &header, &record);
 
 	if (header.RCODE == 0) {
-		cout << record.RDATA << endl;
-		parse_ip(record.RDTA, ip_from_dns);
+		cout << "client data" << record.RDATA << endl;
+		cout << (int)record.RDATA[0] << endl;
+		cout << (int)record.RDATA[1] << endl;
+		cout << (int)record.RDATA[2] << endl;
+		cout << (int)record.RDATA[3] << endl;
+		parse_ip(record.RDATA, ip_from_dns);
 		cout << ip_from_dns << endl;
 	}
 

@@ -62,7 +62,10 @@ void parse_rmsg(char * msg, DNSHeader * header, DNSRecord * record) {
 	record->CLASS = msg_to_ushort(msg, i);
 	record->TTL = msg_to_ushort(msg, i);
 	record->RDLENGTH = msg_to_ushort(msg, i);
-	strncpy(record->RDATA, msg + i, record->RDLENGTH);
+	// strncpy(record->RDATA, msg + i, record->RDLENGTH);
+	for (int j = 0; j < record->RDLENGTH; j++) {
+		record->RDATA[j] = *(msg + i + j);
+	}
 }
 
 void parse_ip(char * rdata, char * ip) {
@@ -156,7 +159,20 @@ int to_rmsg(char * msg, DNSHeader * header, DNSRecord * record) {
 	ushort_to_msg(msg, record->CLASS, i);
 	ushort_to_msg(msg, record->TTL, i);
 	ushort_to_msg(msg, record->RDLENGTH, i);
-	strncpy(msg + i, record->RDATA, record->RDLENGTH);
+	cout << "before cpy" << endl;
+	cout << (int)record->RDATA[0] << endl;
+	cout << (int)record->RDATA[1] << endl;
+	cout << (int)record->RDATA[2] << endl;
+	cout << (int)record->RDATA[3] << endl;
+	for (int j = 0; j < record->RDLENGTH; j++) {
+		*(msg + i + j) = record->RDATA[j];
+	}
+	// strncpy(msg + i, record->RDATA, record->RDLENGTH);
+	cout << "server cpy data" << endl;
+	cout << (int)*(msg + i + 0) << endl;
+	cout << (int)*(msg + i + 1) << endl;
+	cout << (int)*(msg + i + 2) << endl;
+	cout << (int)*(msg + i + 3) << endl;
 	return  i + record->RDLENGTH;
 }
 

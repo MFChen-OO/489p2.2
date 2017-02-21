@@ -295,6 +295,12 @@ int main (int argc, char *argv[]) {
 				record.TTL = 0;
 				record.RDLENGTH = 4;
 				ip_to_data(record.RDATA, response_ip);
+				cout << "server data" << record.RDATA << endl;
+				cout << (int)record.RDATA[0] << endl;
+				cout << (int)record.RDATA[1] << endl;
+				cout << (int)record.RDATA[2] << endl;
+				cout << (int)record.RDATA[3] << endl;
+
 				to_rmsg(rmsg, &header, &record);
 			}
 		}
