@@ -57,11 +57,13 @@ public:
 		while (fin >> ip_addr) {
 			ip_addrs.push_back(ip_addr);
 		}
+		cout << ip_addrs.size() << endl;
 	}
 
 	string get_ip() {
 		string ip = ip_addrs[idx];
 		idx = (idx + 1) % (int) ip_addrs.size();
+		return ip;
 	}
 };
 
@@ -176,8 +178,6 @@ int main (int argc, char *argv[]) {
 		r.init(argv[4]);
 	}
 
-
-	/////////////////////////////////////////////////////////////////////////////////////
 	int sockfd, clientsd;
 	struct addrinfo hints, *servinfo, *p;
 	struct sockaddr_storage their_addr;
@@ -229,7 +229,6 @@ int main (int argc, char *argv[]) {
 	}
 
 	while (true) {
-		///////////////////////////////////////////////////////////////////////
 		sin_size = sizeof(their_addr);
 		clientsd = accept(sockfd, (struct sockaddr *)&their_addr, &sin_size);
 		if (clientsd == -1) {
@@ -242,6 +241,7 @@ int main (int argc, char *argv[]) {
 			ipstr, sizeof(ipstr));
 		string client_ip(ipstr);
 
+		cout << ipstr << endl;
 		// check all new sockets
 		int bytesRecvd, numBytes;
 		bytesRecvd = 0;
@@ -254,7 +254,7 @@ int main (int argc, char *argv[]) {
 			}
 			bytesRecvd += numBytes;
 		}
-		/////////////////////////////////////////////////////////////////////////
+		cout << "recv qmsg" << endl;
 		DNSHeader header;
 		DNSQuestion question;
 		parse_qmsg(qmsg, &header, &question);
@@ -265,6 +265,7 @@ int main (int argc, char *argv[]) {
 		header.QR = 1; // reuse header
 		header.AA = 1;
 
+		cout << "start rmsg" << endl;
 		if (strcmp(question.QNAME, "video.cse.umich.edu") != 0) {
 			header.RCODE = 3;
 			header.ANCOUNT = 0;
@@ -274,9 +275,10 @@ int main (int argc, char *argv[]) {
 			if (is_geo) {
 				response_ip = g.get_ip(client_ip);
 			} else {
+				cout << "round_robin" << endl;
 				response_ip = r.get_ip();
 			}
-
+			cout << "get ip" << endl;
 			if (response_ip.empty()) {
 				header.RCODE = 3;
 				header.ANCOUNT = 0;
@@ -296,7 +298,7 @@ int main (int argc, char *argv[]) {
 				to_rmsg(rmsg, &header, &record);
 			}
 		}
-
+		cout << "start send" << endl;
 		int len = MAX_RLEN;
 		if (sendall(clientsd, rmsg, &len) == -1) {
 			cout << "Error on sendall" << endl;
@@ -311,6 +313,6 @@ int main (int argc, char *argv[]) {
 	}
 
 	close(sockfd);
-
+	fout.close();
 	return 0;
 }
